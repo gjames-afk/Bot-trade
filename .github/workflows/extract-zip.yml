@@ -1,4 +1,4 @@
-name: Extract Dollarzones ZIP
+name: Extract ZIP
 
 on:
   workflow_dispatch:
@@ -11,52 +11,67 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract ZIP
+      - name: Find and extract ZIP
+        shell: bash
         run: |
           set -e
 
-          ZIP_FILE="Dollarzones-ww2-main.zip"
+          echo "Looking for ZIP file..."
 
-          if [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: $ZIP_FILE not found!"
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: No ZIP file found in repository root."
+            echo "Files currently in repository:"
+            ls -la
             exit 1
           fi
 
-          echo "Extracting $ZIP_FILE..."
+          echo "Found ZIP: $ZIP_FILE"
 
           rm -rf extracted
           mkdir extracted
 
           unzip -o "$ZIP_FILE" -d extracted
 
-          echo "Extraction completed."
+          echo "ZIP extracted successfully."
 
-      - name: Move project to root
+      - name: Move project files to root
+        shell: bash
         run: |
           set -e
+
           shopt -s dotglob nullglob
 
+          echo "Preparing project files..."
+
+          # Find the first folder inside extracted
           INNER_DIR=$(find extracted -mindepth 1 -maxdepth 1 -type d | head -n 1)
 
           if [ -n "$INNER_DIR" ]; then
-            echo "Moving files from $INNER_DIR"
+            echo "Found project folder: $INNER_DIR"
             cp -a "$INNER_DIR"/. .
           else
-            echo "Moving extracted files"
+            echo "No inner folder found. Copying files directly."
             cp -a extracted/. .
           fi
 
           rm -rf extracted
-          rm -f "Dollarzones-ww2-main.zip"
 
-      - name: Show project files
+          # Remove ZIP files from repository
+          find . -maxdepth 1 -type f -iname "*.zip" -delete
+
+          echo "Project moved successfully."
+
+      - name: Show final project
         run: |
-          echo "===== PROJECT FILES ====="
+          echo "===== FINAL PROJECT ====="
           find . -maxdepth 3 -type f \
             ! -path "./.git/*" \
             | sort
 
-      - name: Commit extracted files
+      - name: Commit extracted project
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -64,7 +79,7 @@ jobs:
           git add -A
 
           if git diff --cached --quiet; then
-            echo "No changes detected."
+            echo "No changes to commit."
           else
             git commit -m "Extract Dollarzones project"
             git push
