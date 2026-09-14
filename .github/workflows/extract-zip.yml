@@ -3,6 +3,9 @@ name: Extract ZIP
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   extract:
     runs-on: ubuntu-latest
@@ -16,13 +19,10 @@ jobs:
         run: |
           set -e
 
-          echo "Looking for ZIP file..."
-
           ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
             echo "ERROR: No ZIP file found in repository root."
-            echo "Files currently in repository:"
             ls -la
             exit 1
           fi
@@ -34,38 +34,25 @@ jobs:
 
           unzip -o "$ZIP_FILE" -d extracted
 
-          echo "ZIP extracted successfully."
-
       - name: Move project files to root
         shell: bash
         run: |
           set -e
-
           shopt -s dotglob nullglob
 
-          echo "Preparing project files..."
-
-          # Find the first folder inside extracted
           INNER_DIR=$(find extracted -mindepth 1 -maxdepth 1 -type d | head -n 1)
 
           if [ -n "$INNER_DIR" ]; then
-            echo "Found project folder: $INNER_DIR"
             cp -a "$INNER_DIR"/. .
           else
-            echo "No inner folder found. Copying files directly."
             cp -a extracted/. .
           fi
 
           rm -rf extracted
-
-          # Remove ZIP files from repository
           find . -maxdepth 1 -type f -iname "*.zip" -delete
-
-          echo "Project moved successfully."
 
       - name: Show final project
         run: |
-          echo "===== FINAL PROJECT ====="
           find . -maxdepth 3 -type f \
             ! -path "./.git/*" \
             | sort
