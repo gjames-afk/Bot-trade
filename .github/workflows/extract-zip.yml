@@ -1,0 +1,71 @@
+name: Extract Dollarzones ZIP
+
+on:
+  workflow_dispatch:
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract ZIP
+        run: |
+          set -e
+
+          ZIP_FILE="Dollarzones-ww2-main.zip"
+
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "ERROR: $ZIP_FILE not found!"
+            exit 1
+          fi
+
+          echo "Extracting $ZIP_FILE..."
+
+          rm -rf extracted
+          mkdir extracted
+
+          unzip -o "$ZIP_FILE" -d extracted
+
+          echo "Extraction completed."
+
+      - name: Move project to root
+        run: |
+          set -e
+          shopt -s dotglob nullglob
+
+          INNER_DIR=$(find extracted -mindepth 1 -maxdepth 1 -type d | head -n 1)
+
+          if [ -n "$INNER_DIR" ]; then
+            echo "Moving files from $INNER_DIR"
+            cp -a "$INNER_DIR"/. .
+          else
+            echo "Moving extracted files"
+            cp -a extracted/. .
+          fi
+
+          rm -rf extracted
+          rm -f "Dollarzones-ww2-main.zip"
+
+      - name: Show project files
+        run: |
+          echo "===== PROJECT FILES ====="
+          find . -maxdepth 3 -type f \
+            ! -path "./.git/*" \
+            | sort
+
+      - name: Commit extracted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes detected."
+          else
+            git commit -m "Extract Dollarzones project"
+            git push
+          fi
